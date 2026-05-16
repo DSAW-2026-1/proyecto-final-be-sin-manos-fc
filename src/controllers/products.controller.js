@@ -1,4 +1,5 @@
 const pool = require('../config/db')
+const { createNotification } = require('../helpers/notify')
 
 const resolveImageUrl = (url) => {
   if (!url) return null
@@ -154,9 +155,11 @@ exports.getOne = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { productId } = req.params
+    const isAdmin = req.user.role === 'admin'
     const prod = await pool.query('SELECT * FROM products WHERE product_id = $1', [productId])
     if (!prod.rows.length) return res.status(404).json({ error: 'Producto no encontrado' })
-    if (prod.rows[0].seller_id !== req.user.userId) return res.status(403).json({ error: 'No tienes permiso para modificar este producto' })
+    if (!isAdmin && prod.rows[0].seller_id !== req.user.userId)
+      return res.status(403).json({ error: 'No tienes permiso para modificar este producto' })
 
     // Verificar órdenes activas
     const activeOrder = await pool.query(
@@ -164,7 +167,7 @@ exports.update = async (req, res) => {
     )
     if (activeOrder.rows.length) return res.status(409).json({ error: 'No se puede editar un producto con órdenes activas' })
 
-    const { title, description, price, categoryId, condition, stock } = req.body
+    const { title, description, price, categoryId, condition, stock, adminReason } = req.body
     const fields = []; const values = []; let idx = 1
     if (title)       { fields.push(`title = $${idx++}`);       values.push(title.trim()) }
     if (description) { fields.push(`description = $${idx++}`); values.push(description.trim()) }
@@ -189,6 +192,18 @@ exports.update = async (req, res) => {
           [productId, url, i])
       }
     }
+
+    if (isAdmin) {
+      const productTitle = title ? title.trim() : prod.rows[0].title
+      await createNotification({
+        userId: prod.rows[0].seller_id,
+        type: 'order_status',
+        message: `Un administrador ha modificado tu producto: ${productTitle}. Razón: ${adminReason || 'No especificada'}`,
+        resourceId: productId,
+        resourceType: 'product',
+      })
+    }
+
     return res.status(200).json({ productId, updated: true, updatedAt: new Date().toISOString() })
   } catch (err) {
     console.error('[products.update]', err)
