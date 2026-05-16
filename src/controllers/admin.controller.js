@@ -168,9 +168,14 @@ exports.listReports = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT r.report_id, u.name AS reporter_name, r.target_id, r.target_type,
-              r.reason, r.description, r.status, r.created_at
+              r.reason, r.description, r.status, r.created_at,
+              CASE WHEN r.target_type = 'product' THEN p.title
+                   WHEN r.target_type = 'user' THEN u2.name
+              END AS target_title
        FROM reports r
        JOIN users u ON u.user_id = r.reporter_id
+       LEFT JOIN products p ON p.product_id = r.target_id::uuid
+       LEFT JOIN users u2 ON u2.user_id = r.target_id::uuid
        ORDER BY CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END, r.created_at DESC`
     )
     return res.status(200).json(result.rows.map(r => ({
@@ -178,6 +183,7 @@ exports.listReports = async (req, res) => {
       reporterName: r.reporter_name,
       targetId: r.target_id,
       targetType: r.target_type,
+      targetTitle: r.target_title,
       reason: r.reason,
       description: r.description,
       status: r.status,
