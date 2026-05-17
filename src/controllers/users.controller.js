@@ -35,7 +35,12 @@ exports.updateUser = async (req, res) => {
     const { name, career } = req.body
     if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'El nombre no puede estar vacío' })
 
-    const photoUrl = req.file ? `/uploads/${req.file.filename}` : undefined
+    const isProd = process.env.NODE_ENV === 'production'
+    const photoUrl = req.file
+      ? (isProd
+        ? `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
+        : `/uploads/${req.file.filename}`)
+      : undefined
 
     const fields = []
     const values = []
