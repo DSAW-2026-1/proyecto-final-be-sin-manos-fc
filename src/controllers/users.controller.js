@@ -40,7 +40,7 @@ exports.updateUser = async (req, res) => {
       ? (isProd
         ? `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
         : `/uploads/${req.file.filename}`)
-      : undefined
+      : (req.body.photoUrl || undefined)
 
     const fields = []
     const values = []
